@@ -8,12 +8,4 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-
-  if (interaction.commandName === 'ping') {
-    await interaction.reply('Pong!');
-  }
-});
-
-client.login('PASTE_YOUR_NEW_TOKEN_HERE');
+client.login('YOUR_NEW_TOKEN');
