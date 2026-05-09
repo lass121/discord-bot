@@ -8,4 +8,12 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
-client.login(process.env.TOKEN);
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === 'ping') {
+    await interaction.reply('Pong!');
+  }
+});
+
+client.login('MTUwMjQzMTEyODA1MTc3NzU1Ng.GLkmDR.HGztPIA1JhL8Hq7WupcKnEhGeeFs6bY_Hw4LxA');
