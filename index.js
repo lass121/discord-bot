@@ -16,4 +16,4 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-client.login('MTUwMjQzMTEyODA1MTc3NzU1Ng.GLkmDR.HGztPIA1JhL8Hq7WupcKnEhGeeFs6bY_Hw4LxA');
+client.login('PASTE_YOUR_NEW_TOKEN_HERE');
