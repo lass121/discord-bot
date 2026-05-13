@@ -4,16 +4,15 @@ const {
     joinVoiceChannel, 
     createAudioPlayer, 
     createAudioResource, 
-    VoiceConnectionStatus,
-    AudioPlayerStatus 
+    VoiceConnectionStatus 
 } = require('@discordjs/voice');
 const path = require('path');
 
-// 1. Setup Express (Required for Railway Health Checks)
+// 1. Web Server (Railway looks for this to keep the bot alive)
 const app = express();
-app.get("/", (req, res) => res.send("Meow Bot is running 24/7!"));
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.get("/", (req, res) => res.send("Bot is stable."));
+app.listen(PORT, "0.0.0.0", () => console.log(`Health check listening on port ${PORT}`));
 
 // 2. Bot Setup
 const client = new Client({
@@ -28,11 +27,10 @@ const client = new Client({
 // --- CONFIGURATION ---
 const TEXT_CHANNEL_ID = '1488542254598721713'; 
 const VOICE_CHANNEL_ID = '1488542254971748414'; 
-const INTERVAL = 5 * 60 * 1000; // 5 minutes
+const INTERVAL = 5 * 60 * 1000; 
 
 const player = createAudioPlayer();
 
-// 3. Reliable Voice Connection Function
 function stayInVoice() {
     try {
         const guild = client.guilds.cache.first();
@@ -42,60 +40,52 @@ function stayInVoice() {
             channelId: VOICE_CHANNEL_ID,
             guildId: guild.id,
             adapterCreator: guild.voiceAdapterCreator,
-            selfDeaf: false,
-            selfMuted: false
+            selfDeaf: false
         });
 
         connection.subscribe(player);
 
-        // Auto-Reconnect if kicked or disconnected
         connection.on(VoiceConnectionStatus.Disconnected, () => {
-            console.log("Disconnected from voice. Rejoining in 5s...");
+            console.log("Voice disconnected, retrying...");
             setTimeout(stayInVoice, 5000);
         });
-        
-        console.log("Joined Voice Channel successfully.");
     } catch (err) {
-        console.error("Voice Connection Error:", err.message);
+        console.error("Voice connection failed:", err.message);
     }
 }
 
 client.once("ready", () => {
-    console.log(`Logged in as ${client.user.tag}`);
-    
-    // Initial Join
+    console.log(`>>> Bot is ONLINE as ${client.user.tag}`);
     stayInVoice();
 
-    // 4. The 5-Minute Meow Loop
+    // 5-Minute Loop
     setInterval(async () => {
         try {
             // Text Meow
             const channel = await client.channels.fetch(TEXT_CHANNEL_ID).catch(() => null);
-            if (channel && channel.isTextBased()) {
-                await channel.send("Meow!");
-            }
+            if (channel) await channel.send("Meow!");
 
-            // Voice Meow (Plays the meow.mp3 file)
+            // Voice Meow
             const resource = createAudioResource(path.join(__dirname, 'meow.mp3'));
             player.play(resource);
-            console.log("Meowed in chat and voice.");
-        } catch (error) {
-            console.error("Interval Error (Bot staying online):", error.message);
+            console.log("Periodic meow triggered.");
+        } catch (e) {
+            console.log("Loop error caught:", e.message);
         }
     }, INTERVAL);
 });
 
-// Manual Command: !join
-client.on("messageCreate", (message) => {
-    if (message.content === "!join") {
+// Manual command to fix things
+client.on("messageCreate", (msg) => {
+    if (msg.content === "!join") {
         stayInVoice();
-        message.reply("Meow! I'm back in the voice channel.");
+        msg.reply("Meow! Joining voice now.");
     }
 });
 
-// 5. Global Error Handler (Crucial for 24/7 stability)
+// Safety net for Railway
 process.on('unhandledRejection', error => {
-    console.error('Unhandled promise rejection:', error);
+    console.error('Non-crashing error:', error);
 });
 
 client.login(process.env.TOKEN);
