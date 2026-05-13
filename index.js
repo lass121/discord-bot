@@ -2,13 +2,13 @@ const express = require("express");
 const { Client, GatewayIntentBits } = require("discord.js");
 const { 
     joinVoiceChannel, createAudioPlayer, createAudioResource, 
-    VoiceConnectionStatus, StreamType, entersState 
+    VoiceConnectionStatus, StreamType, entersState, AudioPlayerStatus 
 } = require('@discordjs/voice');
 const path = require('path');
 const fs = require('fs');
 
 const app = express();
-app.get("/", (req, res) => res.send("Cat is Active"));
+app.get("/", (req, res) => res.send("Bot Online"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -23,22 +23,26 @@ const client = new Client({
 const VOICE_ID = '1488542254971748414'; 
 const player = createAudioPlayer();
 
-// Function to play the sound
+// Function to fire the meow
 function playMeow() {
-    const filePath = path.join(__dirname, 'Meow.mp3');
-    if (!fs.existsSync(filePath)) return console.log("File Meow.mp3 not found!");
+    const filePath = path.resolve(__dirname, 'Meow.mp3');
+    
+    if (!fs.existsSync(filePath)) {
+        console.log("❌ File Meow.mp3 is missing from the folder!");
+        return;
+    }
 
     const resource = createAudioResource(filePath, {
         inlineVolume: true,
         inputType: StreamType.Arbitrary
     });
     
-    resource.volume.setVolume(2.0); 
+    resource.volume.setVolume(1.8); 
     player.play(resource);
-    console.log("🔊 Meowing started automatically!");
+    console.log("🔊 Playing Meow.mp3 now!");
 }
 
-async function connectAndSpeak() {
+async function connect() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -51,14 +55,14 @@ async function connectAndSpeak() {
     });
 
     try {
-        await entersState(connection, VoiceConnectionStatus.Ready, 20000);
+        // Wait for connection to be solid
+        await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
         connection.subscribe(player);
         
-        // --- THIS IS THE KEY ---
-        // As soon as it's ready, it meows immediately
-        playMeow(); 
+        // AUTO-SPEAK: Trigger meow immediately upon entry
+        playMeow();
         
-        // Forces the green ring to show up
+        // This is the "force speak" command for Discord
         connection.setSpeaking(true); 
 
     } catch (e) {
@@ -67,21 +71,24 @@ async function connectAndSpeak() {
 }
 
 client.once("ready", () => {
-    console.log("Bot is Online!");
-    // Auto-join and Auto-speak on startup
-    connectAndSpeak();
+    console.log("Bot logged in!");
+    connect();
 
-    // Keeps it meowing every 5 minutes automatically
-    setInterval(() => {
-        playMeow();
-    }, 300000);
+    // Auto-Meow Loop (Every 5 minutes)
+    setInterval(() => playMeow(), 300000);
 });
 
 client.on("messageCreate", async (msg) => {
     if (msg.content === "/27 stay") {
-        await connectAndSpeak();
-        msg.reply("I'm in and I should be meowing right now!");
+        await connect();
+        playMeow();
+        msg.reply("I'm in and meowing!");
     }
+});
+
+// Restart if the player stops unexpectedly
+player.on(AudioPlayerStatus.Idle, () => {
+    console.log("Audio finished.");
 });
 
 client.login(process.env.TOKEN);
