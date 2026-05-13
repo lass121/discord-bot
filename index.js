@@ -4,71 +4,77 @@ const {
     joinVoiceChannel, 
     createAudioPlayer, 
     createAudioResource, 
-    VoiceConnectionStatus 
+    VoiceConnectionStatus,
+    AudioPlayerStatus
 } = require('@discordjs/voice');
 const path = require('path');
 
 const app = express();
-app.get("/", (req, res) => res.send("Bot is alive!"));
+app.get("/", (req, res) => res.send("Bot is online 24/7"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds, 
     GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildMessages
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
   ]
 });
 
 // --- SETTINGS ---
 const TEXT_CHANNEL_ID = '1488542254598721713'; 
-// !!! DOUBLE CHECK THIS ID: It must be the Voice Channel, not the Text Channel.
-const VOICE_CHANNEL_ID = '1488542254598721713'; 
+const VOICE_CHANNEL_ID = 'PASTE_ACTUAL_VOICE_ID_HERE'; // <--- YOU MUST CHANGE THIS
 const INTERVAL = 5 * 60 * 1000; 
 
 const player = createAudioPlayer();
 
-client.once("ready", async () => {
-    console.log(`Logged in as ${client.user.tag}`);
-    
-    // Attempt to join voice
-    maintainVoice();
+// Function to keep the bot in voice
+function stayInVoice() {
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
 
+    const connection = joinVoiceChannel({
+        channelId: VOICE_CHANNEL_ID,
+        guildId: guild.id,
+        adapterCreator: guild.voiceAdapterCreator,
+        selfDeaf: false,
+        selfMuted: false
+    });
+
+    connection.subscribe(player);
+
+    // If kicked, reconnect after 5 seconds
+    connection.on(VoiceConnectionStatus.Disconnected, () => {
+        console.log("Attempting to reconnect to stay 24/7...");
+        setTimeout(stayInVoice, 5000);
+    });
+}
+
+client.once("ready", () => {
+    console.log(`Logged in as ${client.user.tag}`);
+    stayInVoice(); // Join automatically on startup
+
+    // 5-Minute Meow Loop (Chat and Voice)
     setInterval(async () => {
         try {
-            // 1. Text Meow
-            const channel = await client.channels.fetch(TEXT_CHANNEL_ID).catch(() => null);
+            const channel = await client.channels.fetch(TEXT_CHANNEL_ID);
             if (channel) await channel.send("Meow!");
 
-            // 2. Voice Meow
             const resource = createAudioResource(path.join(__dirname, 'meow.mp3'));
             player.play(resource);
         } catch (e) {
-            console.log("Loop error, but staying online:", e.message);
+            console.log("Error in meow loop:", e.message);
         }
     }, INTERVAL);
 });
 
-function maintainVoice() {
-    const guild = client.guilds.cache.first();
-    if (!guild) return;
-
-    try {
-        const connection = joinVoiceChannel({
-            channelId: VOICE_CHANNEL_ID,
-            guildId: guild.id,
-            adapterCreator: guild.voiceAdapterCreator,
-            selfDeaf: false
-        });
-
-        connection.subscribe(player);
-
-        connection.on(VoiceConnectionStatus.Disconnected, () => {
-            setTimeout(maintainVoice, 5000);
-        });
-    } catch (err) {
-        console.log("Voice failed to start, but bot is still online.");
+// Command to manually force join: !join
+client.on("messageCreate", (message) => {
+    if (message.content === "!join") {
+        stayInVoice();
+        message.reply("I'm here to stay! Meow.");
     }
-}
+});
 
 client.login(process.env.TOKEN);
