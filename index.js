@@ -2,13 +2,13 @@ const express = require("express");
 const { Client, GatewayIntentBits } = require("discord.js");
 const { 
     joinVoiceChannel, createAudioPlayer, createAudioResource, 
-    VoiceConnectionStatus, StreamType, entersState 
+    VoiceConnectionStatus, StreamType, entersState, AudioPlayerStatus 
 } = require('@discordjs/voice');
 const path = require('path');
 const fs = require('fs');
 
 const app = express();
-app.get("/", (req, res) => res.send("Bot is Ready"));
+app.get("/", (req, res) => res.send("Bot is Active"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -23,14 +23,18 @@ const client = new Client({
 const VOICE_ID = '1488542254971748414'; 
 const player = createAudioPlayer();
 
-async function playMeow() {
-    // We check both "Meow.mp3" and "meow.mp3" just in case
-    const file1 = path.join(__dirname, 'Meow.mp3');
-    const file2 = path.join(__dirname, 'meow.mp3');
-    const filePath = fs.existsSync(file1) ? file1 : file2;
+// Log player status to see where it stops
+player.on('stateChange', (oldState, newState) => {
+    console.log(`Audio Player: ${oldState.status} -> ${newState.status}`);
+});
 
+async function playMeow() {
+    // Check for the file with a capital M as seen in your upload
+    const filePath = path.join(__dirname, 'Meow.mp3');
+    
     if (!fs.existsSync(filePath)) {
-        return console.log("ERROR: File not found on GitHub. Check your spelling!");
+        console.log("❌ ERROR: Meow.mp3 NOT FOUND. Ensure file is in the main folder.");
+        return;
     }
 
     try {
@@ -39,16 +43,15 @@ async function playMeow() {
             inputType: StreamType.Arbitrary
         });
         
-        // Volume at 200% for testing
-        resource.volume.setVolume(2.0); 
+        resource.volume.setVolume(2.0); // 200% volume
         player.play(resource);
-        console.log("Audio sent to player.");
+        console.log("✅ Meow resource sent to player.");
     } catch (err) {
-        console.error("Playback error:", err.message);
+        console.error("❌ Audio Error:", err.message);
     }
 }
 
-async function connect() {
+async function connectToVoice() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -61,25 +64,26 @@ async function connect() {
     });
 
     try {
-        await entersState(connection, VoiceConnectionStatus.Ready, 10000);
+        await entersState(connection, VoiceConnectionStatus.Ready, 15000);
         connection.subscribe(player);
-        // Force the "Green Circle" to appear
+        // Force the "Green Circle" indicator
         connection.setSpeaking(true); 
+        console.log("🔊 Connection Ready and Speaking enabled.");
     } catch (e) {
-        console.error("Connection error:", e);
+        console.error("❌ Connection failed:", e);
     }
 }
 
 client.once("ready", () => {
-    console.log("Cat Bot is Online!");
-    connect();
+    console.log(`Bot logged in as ${client.user.tag}`);
+    connectToVoice();
 });
 
 client.on("messageCreate", async (msg) => {
     if (msg.content === "/27 stay") {
-        await connect();
+        await connectToVoice();
         playMeow();
-        msg.reply("I'm here! Check the green circle.");
+        msg.reply("I'm here! Check if you see a green circle around me.");
     }
     if (msg.content === "/meow now") {
         playMeow();
