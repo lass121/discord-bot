@@ -22,9 +22,8 @@ const client = new Client({
 });
 
 // --- SETTINGS ---
-// I used the ID you provided earlier. Ensure this is your VOICE channel ID.
 const TEXT_CHANNEL_ID = '1488542254598721713'; 
-const VOICE_CHANNEL_ID = '1488542254598721713'; 
+const VOICE_CHANNEL_ID = '1488542254598721713'; // <-- MAKE SURE THIS IS THE VOICE CHANNEL ID
 const INTERVAL = 5 * 60 * 1000; 
 
 let connection;
@@ -79,7 +78,6 @@ function maintainVoiceConnection() {
 
 function playMeowFile() {
     try {
-        // This looks for the meow.mp3 file you uploaded to your GitHub
         const resource = createAudioResource(path.join(__dirname, 'meow.mp3'));
         player.play(resource);
         console.log("Played meow.mp3 in voice channel.");
