@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-app.get("/", (req, res) => res.send("Bot Online"));
+app.get("/", (req, res) => res.send("Cat Online"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -23,12 +23,11 @@ const client = new Client({
 const VOICE_ID = '1488542254971748414'; 
 const player = createAudioPlayer();
 
-// Function to fire the meow
 function playMeow() {
     const filePath = path.resolve(__dirname, 'Meow.mp3');
     
     if (!fs.existsSync(filePath)) {
-        console.log("❌ File Meow.mp3 is missing from the folder!");
+        console.log("❌ Meow.mp3 file not found!");
         return;
     }
 
@@ -37,9 +36,10 @@ function playMeow() {
         inputType: StreamType.Arbitrary
     });
     
-    resource.volume.setVolume(1.8); 
+    // Max volume for testing
+    resource.volume.setVolume(2.0); 
     player.play(resource);
-    console.log("🔊 Playing Meow.mp3 now!");
+    console.log("🔊 Playing meow...");
 }
 
 async function connect() {
@@ -59,10 +59,8 @@ async function connect() {
         await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
         connection.subscribe(player);
         
-        // AUTO-SPEAK: Trigger meow immediately upon entry
+        // --- AUTO SPEAK ---
         playMeow();
-        
-        // This is the "force speak" command for Discord
         connection.setSpeaking(true); 
 
     } catch (e) {
@@ -73,8 +71,7 @@ async function connect() {
 client.once("ready", () => {
     console.log("Bot logged in!");
     connect();
-
-    // Auto-Meow Loop (Every 5 minutes)
+    // Auto-meow loop
     setInterval(() => playMeow(), 300000);
 });
 
@@ -84,11 +81,6 @@ client.on("messageCreate", async (msg) => {
         playMeow();
         msg.reply("I'm in and meowing!");
     }
-});
-
-// Restart if the player stops unexpectedly
-player.on(AudioPlayerStatus.Idle, () => {
-    console.log("Audio finished.");
 });
 
 client.login(process.env.TOKEN);
