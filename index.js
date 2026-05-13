@@ -5,18 +5,14 @@ const {
     createAudioPlayer, 
     createAudioResource, 
     VoiceConnectionStatus,
-    AudioPlayerStatus,
-    NoSubscriberBehavior
+    AudioPlayerStatus 
 } = require('@discordjs/voice');
 const path = require('path');
 
-// 1. Keep-Alive Server
 const app = express();
-const PORT = process.env.PORT || 3000;
-app.get("/", (req, res) => res.send("Bot is active!"));
-app.listen(PORT, "0.0.0.0");
+app.get("/", (req, res) => res.send("Bot is running 24/7!"));
+app.listen(process.env.PORT || 3000);
 
-// 2. Bot Setup
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds, 
@@ -26,27 +22,27 @@ const client = new Client({
   ]
 });
 
+// --- SETTINGS ---
 const TEXT_CHANNEL_ID = '1488542254598721713'; 
 const VOICE_CHANNEL_ID = '1488542254971748414'; 
 const INTERVAL = 5 * 60 * 1000; 
 
-const player = createAudioPlayer({
-    behaviors: { noSubscriber: NoSubscriberBehavior.Play }
-});
+const player = createAudioPlayer();
 
+// Function to play the sound
 function playMeow() {
     try {
-        const filePath = path.join(__dirname, 'meow.mp3');
-        const resource = createAudioResource(filePath, { inlineVolume: true });
-        resource.volume.setVolume(1.0); 
+        const resource = createAudioResource(path.join(__dirname, 'meow.mp3'), { inlineVolume: true });
+        resource.volume.setVolume(1.0);
         player.play(resource);
-        console.log("Playing meow sound...");
+        console.log("Playing meow sound.");
     } catch (err) {
-        console.error("Playback Error:", err.message);
+        console.error("Playback error:", err.message);
     }
 }
 
-function stayInVoice() {
+// Function to join and stay 24/7
+function connectAndStay() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -54,36 +50,37 @@ function stayInVoice() {
         channelId: VOICE_CHANNEL_ID,
         guildId: guild.id,
         adapterCreator: guild.voiceAdapterCreator,
-        selfDeaf: false,
-        selfMuted: false
+        selfDeaf: false
     });
 
     connection.subscribe(player);
 
     connection.on(VoiceConnectionStatus.Disconnected, () => {
-        setTimeout(stayInVoice, 5000);
+        console.log("Reconnecting to stay 24/7...");
+        setTimeout(connectAndStay, 5000);
     });
 }
 
 client.once("ready", () => {
     console.log(`Logged in as ${client.user.tag}`);
-    stayInVoice();
+    connectAndStay(); // Join immediately on start
 
+    // 5-Minute Loop
     setInterval(async () => {
+        // Chat Meow
         const channel = await client.channels.fetch(TEXT_CHANNEL_ID).catch(() => null);
         if (channel) channel.send("Meow!");
+
+        // Voice Meow
         playMeow();
     }, INTERVAL);
 });
 
 client.on("messageCreate", (msg) => {
-    if (msg.content === "!meow") {
-        playMeow();
-        msg.reply("Meow!");
-    }
-    if (msg.content === "!join") {
-        stayInVoice();
-        msg.reply("Rejoined voice!");
+    // Your requested command to force stay
+    if (msg.content === "/27 stay" || msg.content === "!stay") {
+        connectAndStay();
+        msg.reply("I am now locked into the voice channel 24/7. Meow!");
     }
 });
 
