@@ -5,12 +5,14 @@ const {
     createAudioPlayer, 
     createAudioResource, 
     VoiceConnectionStatus,
-    AudioPlayerStatus 
+    AudioPlayerStatus,
+    NoSubscriberBehavior,
+    StreamType
 } = require('@discordjs/voice');
 const path = require('path');
 
 const app = express();
-app.get("/", (req, res) => res.send("Bot is running 24/7!"));
+app.get("/", (req, res) => res.send("Meow Bot is 24/7 and Loud!"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -27,22 +29,35 @@ const TEXT_CHANNEL_ID = '1488542254598721713';
 const VOICE_CHANNEL_ID = '1488542254971748414'; 
 const INTERVAL = 5 * 60 * 1000; 
 
-const player = createAudioPlayer();
+const player = createAudioPlayer({
+    behaviors: {
+        noSubscriber: NoSubscriberBehavior.Play,
+    },
+});
 
-// Function to play the sound
 function playMeow() {
     try {
-        const resource = createAudioResource(path.join(__dirname, 'meow.mp3'), { inlineVolume: true });
-        resource.volume.setVolume(1.0);
+        const filePath = path.join(__dirname, 'meow.mp3');
+        
+        // Create the resource with high-quality settings
+        const resource = createAudioResource(filePath, {
+            inlineVolume: true,
+            inputType: StreamType.Arbitrary
+        });
+
+        // Set volume to 100% (1.0)
+        // If the file is still too quiet, you can try 1.5 or 2.0, 
+        // but 1.0 is the "perfect" soft/clear setting.
+        resource.volume.setVolume(1.0); 
+
         player.play(resource);
-        console.log("Playing meow sound.");
+        console.log("Meow audio pushed to player.");
     } catch (err) {
-        console.error("Playback error:", err.message);
+        console.error("Audio Error:", err.message);
     }
 }
 
-// Function to join and stay 24/7
-function connectAndStay() {
+function connectToVoice() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -50,37 +65,37 @@ function connectAndStay() {
         channelId: VOICE_CHANNEL_ID,
         guildId: guild.id,
         adapterCreator: guild.voiceAdapterCreator,
-        selfDeaf: false
+        selfDeaf: false,
+        selfMuted: false
     });
 
     connection.subscribe(player);
 
     connection.on(VoiceConnectionStatus.Disconnected, () => {
-        console.log("Reconnecting to stay 24/7...");
-        setTimeout(connectAndStay, 5000);
+        setTimeout(connectToVoice, 5000);
     });
 }
 
 client.once("ready", () => {
-    console.log(`Logged in as ${client.user.tag}`);
-    connectAndStay(); // Join immediately on start
+    console.log(`Bot Online: ${client.user.tag}`);
+    connectToVoice();
 
-    // 5-Minute Loop
     setInterval(async () => {
-        // Chat Meow
+        // 1. Text Meow
         const channel = await client.channels.fetch(TEXT_CHANNEL_ID).catch(() => null);
         if (channel) channel.send("Meow!");
 
-        // Voice Meow
+        // 2. Voice Meow
         playMeow();
     }, INTERVAL);
 });
 
 client.on("messageCreate", (msg) => {
-    // Your requested command to force stay
-    if (msg.content === "/27 stay" || msg.content === "!stay") {
-        connectAndStay();
-        msg.reply("I am now locked into the voice channel 24/7. Meow!");
+    // Your command
+    if (msg.content === "/27 stay") {
+        connectToVoice();
+        msg.reply("Locked in 24/7. Hearing check initiated! Meow.");
+        playMeow(); // Play immediately to test
     }
 });
 
