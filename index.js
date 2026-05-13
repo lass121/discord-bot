@@ -9,13 +9,13 @@ const {
 } = require('@discordjs/voice');
 const path = require('path');
 
-// 1. Web Server to prevent Railway from idling
+// 1. Setup Express (Required for Railway Health Checks)
 const app = express();
-app.get("/", (req, res) => res.send("Bot is stable and online!"));
+app.get("/", (req, res) => res.send("Meow Bot is running 24/7!"));
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Web server active on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
-// 2. Bot Setup with necessary Permissions
+// 2. Bot Setup
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds, 
@@ -25,71 +25,75 @@ const client = new Client({
   ]
 });
 
-// --- SETTINGS ---
+// --- CONFIGURATION ---
 const TEXT_CHANNEL_ID = '1488542254598721713'; 
 const VOICE_CHANNEL_ID = '1488542254971748414'; 
-const INTERVAL = 5 * 60 * 1000; 
+const INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 const player = createAudioPlayer();
 
-// 3. Reliable Voice Connection Logic
+// 3. Reliable Voice Connection Function
 function stayInVoice() {
     try {
         const guild = client.guilds.cache.first();
-        if (!guild) return console.log("Waiting for guild cache...");
+        if (!guild) return;
 
         const connection = joinVoiceChannel({
             channelId: VOICE_CHANNEL_ID,
             guildId: guild.id,
             adapterCreator: guild.voiceAdapterCreator,
-            selfDeaf: false
+            selfDeaf: false,
+            selfMuted: false
         });
 
         connection.subscribe(player);
 
-        // Auto-Reconnect if disconnected or kicked
+        // Auto-Reconnect if kicked or disconnected
         connection.on(VoiceConnectionStatus.Disconnected, () => {
-            console.log("Detected disconnection. Reconnecting in 5s...");
+            console.log("Disconnected from voice. Rejoining in 5s...");
             setTimeout(stayInVoice, 5000);
         });
-
-        console.log("Voice connection established.");
-    } catch (error) {
-        console.error("Voice Error (Bot staying online):", error.message);
+        
+        console.log("Joined Voice Channel successfully.");
+    } catch (err) {
+        console.error("Voice Connection Error:", err.message);
     }
 }
 
 client.once("ready", () => {
-    console.log(`Successfully logged in as ${client.user.tag}`);
+    console.log(`Logged in as ${client.user.tag}`);
+    
+    // Initial Join
     stayInVoice();
 
-    // 4. The 5-Minute Loop (Protected from crashes)
+    // 4. The 5-Minute Meow Loop
     setInterval(async () => {
         try {
             // Text Meow
-            const tChannel = await client.channels.fetch(TEXT_CHANNEL_ID).catch(() => null);
-            if (tChannel) await tChannel.send("Meow!");
+            const channel = await client.channels.fetch(TEXT_CHANNEL_ID).catch(() => null);
+            if (channel && channel.isTextBased()) {
+                await channel.send("Meow!");
+            }
 
-            // Voice Meow
-            const filePath = path.join(__dirname, 'meow.mp3');
-            const resource = createAudioResource(filePath);
+            // Voice Meow (Plays the meow.mp3 file)
+            const resource = createAudioResource(path.join(__dirname, 'meow.mp3'));
             player.play(resource);
-            console.log("Meow interval triggered successfully.");
-        } catch (err) {
-            console.error("Interval loop recovered from error:", err.message);
+            console.log("Meowed in chat and voice.");
+        } catch (error) {
+            console.error("Interval Error (Bot staying online):", error.message);
         }
     }, INTERVAL);
 });
 
-// Manual Fix Command: !join
-client.on("messageCreate", (msg) => {
-    if (msg.content === "!join") {
+// Manual Command: !join
+client.on("messageCreate", (message) => {
+    if (message.content === "!join") {
         stayInVoice();
-        msg.reply("Meow! Re-joined and locked in.");
+        message.reply("Meow! I'm back in the voice channel.");
     }
 });
 
-// 5. Global Error Handling (Prevents the bot from crashing on any random error)
+// 5. Global Error Handler (Crucial for 24/7 stability)
 process.on('unhandledRejection', error => {
     console.error('Unhandled promise rejection:', error);
 });
