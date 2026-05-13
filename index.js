@@ -2,13 +2,12 @@ const express = require("express");
 const { Client, GatewayIntentBits } = require("discord.js");
 const { 
     joinVoiceChannel, createAudioPlayer, createAudioResource, 
-    VoiceConnectionStatus, StreamType, entersState, AudioPlayerStatus 
+    VoiceConnectionStatus, StreamType, entersState 
 } = require('@discordjs/voice');
 const path = require('path');
 const fs = require('fs');
 
 const app = express();
-app.get("/", (req, res) => res.send("Bot Online"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -24,21 +23,25 @@ const VOICE_ID = '1488542254971748414';
 const player = createAudioPlayer();
 
 function playMeow() {
-    const filePath = path.resolve(__dirname, 'Meow.mp3');
-    if (!fs.existsSync(filePath)) return console.log("File Meow.mp3 is missing!");
+    // Force path resolution for Meow.mp3
+    const filePath = path.join(process.cwd(), 'Meow.mp3');
+    
+    if (!fs.existsSync(filePath)) {
+        console.log("!!! FILE MISSING: Meow.mp3 must be in the main folder !!!");
+        return;
+    }
 
     const resource = createAudioResource(filePath, {
         inlineVolume: true,
         inputType: StreamType.Arbitrary
     });
     
-    // FORCED LOUD VOLUME
-    resource.volume.setVolume(2.5); 
+    resource.volume.setVolume(2.0); 
     player.play(resource);
-    console.log("🔊 Meow triggered!");
+    console.log("Audio stream pushed to Discord.");
 }
 
-async function connect() {
+async function forceConnect() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -51,34 +54,30 @@ async function connect() {
     });
 
     try {
-        await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
+        await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
         connection.subscribe(player);
         
-        // This is the "Wake Up" signal
+        // This is the bypass: It tells Discord we are ALREADY speaking
         connection.setSpeaking(true);
-        playMeow(); 
         
+        playMeow();
+        console.log("Bypass Successful: Bot is now meowing.");
     } catch (e) {
-        console.error("Connection error:", e);
+        console.error("Connection failed.");
     }
 }
 
 client.once("ready", () => {
-    console.log("Cat Bot is Live!");
-    connect();
-    
-    // Auto-Meow every 5 mins
-    setInterval(() => playMeow(), 300000);
+    console.log("Bot Bypassed and Ready.");
+    forceConnect();
+    // Auto-repeat every 5 minutes
+    setInterval(playMeow, 300000);
 });
 
-client.on("messageCreate", async (msg) => {
-    if (msg.content === "/27 stay") {
-        await connect();
-        msg.reply("Connected! Meowing now...");
-    }
+client.on("messageCreate", (msg) => {
     if (msg.content === "/meow now") {
         playMeow();
-        msg.reply("Meow!");
+        msg.reply("Forcing Meow...");
     }
 });
 
