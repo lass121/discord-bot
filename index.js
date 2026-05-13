@@ -2,7 +2,7 @@ const express = require("express");
 const { Client, GatewayIntentBits } = require("discord.js");
 const { 
     joinVoiceChannel, createAudioPlayer, createAudioResource, 
-    VoiceConnectionStatus, StreamType, entersState 
+    VoiceConnectionStatus, StreamType, entersState, AudioPlayerStatus 
 } = require('@discordjs/voice');
 const path = require('path');
 const fs = require('fs');
@@ -23,25 +23,25 @@ const VOICE_ID = '1488542254971748414';
 const player = createAudioPlayer();
 
 function playMeow() {
-    // Force path resolution for Meow.mp3
     const filePath = path.join(process.cwd(), 'Meow.mp3');
     
     if (!fs.existsSync(filePath)) {
-        console.log("!!! FILE MISSING: Meow.mp3 must be in the main folder !!!");
+        console.log("❌ FILE NOT FOUND on server!");
         return;
     }
 
+    // BYPASS: We force FFmpeg to re-read the file properly
     const resource = createAudioResource(filePath, {
-        inlineVolume: true,
-        inputType: StreamType.Arbitrary
+        inputType: StreamType.Arbitrary, // This lets FFmpeg handle weird MP3s
+        inlineVolume: true
     });
     
     resource.volume.setVolume(2.0); 
     player.play(resource);
-    console.log("Audio stream pushed to Discord.");
+    console.log("🔊 Playback command sent.");
 }
 
-async function forceConnect() {
+async function connect() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -56,29 +56,28 @@ async function forceConnect() {
     try {
         await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
         connection.subscribe(player);
-        
-        // This is the bypass: It tells Discord we are ALREADY speaking
         connection.setSpeaking(true);
-        
         playMeow();
-        console.log("Bypass Successful: Bot is now meowing.");
     } catch (e) {
         console.error("Connection failed.");
     }
 }
 
 client.once("ready", () => {
-    console.log("Bot Bypassed and Ready.");
-    forceConnect();
-    // Auto-repeat every 5 minutes
-    setInterval(playMeow, 300000);
+    console.log("Bot Ready.");
+    connect();
 });
 
 client.on("messageCreate", (msg) => {
     if (msg.content === "/meow now") {
         playMeow();
-        msg.reply("Forcing Meow...");
+        msg.reply("Meowing...");
     }
+});
+
+// If the player errors, we log it exactly
+player.on('error', error => {
+  console.error(`Error: ${error.message}`);
 });
 
 client.login(process.env.TOKEN);
