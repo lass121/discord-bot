@@ -9,7 +9,7 @@ const {
 const path = require('path');
 
 const app = express();
-app.get("/", (req, res) => res.send("Bot is active on Railway!"));
+app.get("/", (req, res) => res.send("Meow Bot is running on Railway 24/7!"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -21,15 +21,17 @@ const client = new Client({
   ]
 });
 
+// --- SETTINGS ---
 const TEXT_CHANNEL_ID = '1488542254598721713'; 
-const VOICE_CHANNEL_ID = 'PASTE_YOUR_VOICE_ID_HERE'; // <--- RIGHT CLICK VOICE CHANNEL & COPY ID
-const INTERVAL = 5 * 60 * 1000; 
+const VOICE_CHANNEL_ID = '1488542254971748414'; 
+const INTERVAL = 5 * 60 * 1000; // 5 Minutes
 
 const player = createAudioPlayer();
 
-function connectVoice() {
+// Logic to join and stay in voice
+function stayInVoice() {
     const guild = client.guilds.cache.first();
-    if (!guild || !VOICE_CHANNEL_ID || VOICE_CHANNEL_ID.includes('PASTE')) return;
+    if (!guild) return console.log("Bot is not in a server yet.");
 
     const connection = joinVoiceChannel({
         channelId: VOICE_CHANNEL_ID,
@@ -40,35 +42,38 @@ function connectVoice() {
 
     connection.subscribe(player);
 
+    // 24/7 Reconnect Logic
     connection.on(VoiceConnectionStatus.Disconnected, () => {
-        console.log("Disconnected. Reconnecting...");
-        setTimeout(connectVoice, 5000);
+        console.log("Disconnected! Reconnecting to stay 24/7...");
+        setTimeout(stayInVoice, 5000);
     });
 }
 
 client.once("ready", () => {
     console.log(`Logged in as ${client.user.tag}`);
-    connectVoice();
+    stayInVoice();
 
+    // The 5-Minute Meow Loop
     setInterval(async () => {
         try {
-            // Text Meow
-            const channel = await client.channels.fetch(TEXT_CHANNEL_ID).catch(() => null);
-            if (channel) await channel.send("Meow!");
+            // 1. Text Meow
+            const tChannel = await client.channels.fetch(TEXT_CHANNEL_ID).catch(() => null);
+            if (tChannel) await tChannel.send("Meow!");
 
-            // Voice Meow
+            // 2. Voice Meow
             const resource = createAudioResource(path.join(__dirname, 'meow.mp3'));
             player.play(resource);
-        } catch (e) {
-            console.log("Interval error:", e.message);
+        } catch (err) {
+            console.log("Loop error:", err.message);
         }
     }, INTERVAL);
 });
 
+// Manual command to bring bot in if needed
 client.on("messageCreate", (msg) => {
     if (msg.content === "!join") {
-        connectVoice();
-        msg.reply("Meow! I'm staying in the voice channel now.");
+        stayInVoice();
+        msg.reply("Meow! I'm here to stay 24/7.");
     }
 });
 
