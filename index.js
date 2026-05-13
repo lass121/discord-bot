@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-app.get("/", (req, res) => res.send("Cat Online"));
+app.get("/", (req, res) => res.send("Bot Online"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -25,21 +25,17 @@ const player = createAudioPlayer();
 
 function playMeow() {
     const filePath = path.resolve(__dirname, 'Meow.mp3');
-    
-    if (!fs.existsSync(filePath)) {
-        console.log("❌ Meow.mp3 file not found!");
-        return;
-    }
+    if (!fs.existsSync(filePath)) return console.log("File Meow.mp3 is missing!");
 
     const resource = createAudioResource(filePath, {
         inlineVolume: true,
         inputType: StreamType.Arbitrary
     });
     
-    // Max volume for testing
-    resource.volume.setVolume(2.0); 
+    // FORCED LOUD VOLUME
+    resource.volume.setVolume(2.5); 
     player.play(resource);
-    console.log("🔊 Playing meow...");
+    console.log("🔊 Meow triggered!");
 }
 
 async function connect() {
@@ -55,31 +51,34 @@ async function connect() {
     });
 
     try {
-        // Wait for connection to be solid
-        await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+        await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
         connection.subscribe(player);
         
-        // --- AUTO SPEAK ---
-        playMeow();
-        connection.setSpeaking(true); 
-
+        // This is the "Wake Up" signal
+        connection.setSpeaking(true);
+        playMeow(); 
+        
     } catch (e) {
-        console.error("Connection failed:", e);
+        console.error("Connection error:", e);
     }
 }
 
 client.once("ready", () => {
-    console.log("Bot logged in!");
+    console.log("Cat Bot is Live!");
     connect();
-    // Auto-meow loop
+    
+    // Auto-Meow every 5 mins
     setInterval(() => playMeow(), 300000);
 });
 
 client.on("messageCreate", async (msg) => {
     if (msg.content === "/27 stay") {
         await connect();
+        msg.reply("Connected! Meowing now...");
+    }
+    if (msg.content === "/meow now") {
         playMeow();
-        msg.reply("I'm in and meowing!");
+        msg.reply("Meow!");
     }
 });
 
