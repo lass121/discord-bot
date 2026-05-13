@@ -3,7 +3,6 @@ const { Client, GatewayIntentBits } = require("discord.js");
 
 const app = express();
 
-// Web server for hosting/pinging
 app.get("/", (req, res) => {
   res.send("Bot is running.");
 });
@@ -14,33 +13,32 @@ app.listen(PORT, () => {
   console.log(`Web server running on port ${PORT}`);
 });
 
-// Initialize Discord Client
 const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
-client.once("ready", () => {
+client.once("ready", async () => {
   console.log(`Logged in as ${client.user.tag}`);
 
-  // --- AUTOMATED MESSAGE SETTINGS ---
   const CHANNEL_ID = '1488542254598721713'; 
   const FIVE_MINUTES = 5 * 60 * 1000; 
 
-  console.log(`Timer started: Sending message to ${CHANNEL_ID} every 5 minutes.`);
+  try {
+    const channel = await client.channels.fetch(CHANNEL_ID);
+    if (channel && channel.isTextBased()) {
+      // Sends the first meow immediately on startup
+      await channel.send("Meow!"); 
 
-  setInterval(async () => {
-    try {
-      const channel = await client.channels.fetch(CHANNEL_ID);
+      // Then starts the 5-minute loop
+      setInterval(async () => {
+        await channel.send("Meow!");
+      }, FIVE_MINUTES);
       
-      if (channel && channel.isTextBased()) {
-        await channel.send("This is an automated message sent every five minutes.");
-      }
-    } catch (error) {
-      console.error("Error sending automated message:", error.message);
+      console.log("Meow timer started!");
     }
-  }, FIVE_MINUTES);
-  // ----------------------------------
+  } catch (error) {
+    console.error("Error starting the meow loop:", error.message);
+  }
 });
 
-// Log in using the TOKEN environment variable
 client.login(process.env.TOKEN);
