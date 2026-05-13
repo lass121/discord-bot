@@ -1,12 +1,16 @@
 const express = require("express");
 const { Client, GatewayIntentBits } = require("discord.js");
 const { 
-    joinVoiceChannel, createAudioPlayer, createAudioResource, 
-    VoiceConnectionStatus, AudioPlayerStatus, StreamType, entersState 
+    joinVoiceChannel, 
+    createAudioPlayer, 
+    createAudioResource, 
+    VoiceConnectionStatus, 
+    StreamType 
 } = require('@discordjs/voice');
 const path = require('path');
 
 const app = express();
+app.get("/", (req, res) => res.send("Bot Online"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -22,19 +26,24 @@ const VOICE_ID = '1488542254971748414';
 const TEXT_ID = '1488542254598721713';
 const player = createAudioPlayer();
 
-async function playMeow() {
+function playMeow() {
     try {
-        const resource = createAudioResource(path.join(__dirname, 'meow.mp3'), {
+        const filePath = path.resolve(__dirname, 'meow.mp3');
+        const resource = createAudioResource(filePath, {
             inlineVolume: true,
             inputType: StreamType.Arbitrary
         });
-        resource.volume.setVolume(1.0);
+        
+        // Boosting volume to 2.0 (200%) to ensure it's heard
+        resource.volume.setVolume(2.0); 
         player.play(resource);
-        console.log("Audio playing...");
-    } catch (e) { console.log("Audio Error:", e.message); }
+        console.log("Meow triggered.");
+    } catch (e) {
+        console.error("Audio error:", e.message);
+    }
 }
 
-async function connect() {
+function connect() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -46,27 +55,29 @@ async function connect() {
         selfMuted: false
     });
 
-    try {
-        await entersState(connection, VoiceConnectionStatus.Ready, 20000);
-        connection.subscribe(player);
-        // This 'setSpeaking' is required for the green circle to appear
-        connection.setSpeaking(true);
-    } catch (e) { console.log("Connection failed"); }
+    connection.subscribe(player);
 }
 
 client.once("ready", () => {
+    console.log("Bot is ready!");
     connect();
-    setInterval(() => {
-        client.channels.fetch(TEXT_ID).then(c => c.send("Meow!"));
+
+    // 5-minute loop
+    setInterval(async () => {
+        const channel = await client.channels.fetch(TEXT_ID).catch(() => null);
+        if (channel) channel.send("Meow!");
         playMeow();
     }, 300000);
 });
 
-client.on("messageCreate", async (msg) => {
+client.on("messageCreate", (msg) => {
     if (msg.content === "/27 stay") {
-        await connect();
+        connect();
         playMeow();
-        msg.reply("I am locked in. Meow!");
+        msg.reply("I'm staying 24/7! Meow.");
+    }
+    if (msg.content === "/meow now") {
+        playMeow();
     }
 });
 
