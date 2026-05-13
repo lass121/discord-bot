@@ -2,13 +2,13 @@ const express = require("express");
 const { Client, GatewayIntentBits } = require("discord.js");
 const { 
     joinVoiceChannel, createAudioPlayer, createAudioResource, 
-    VoiceConnectionStatus, StreamType, entersState, AudioPlayerStatus 
+    VoiceConnectionStatus, StreamType, entersState 
 } = require('@discordjs/voice');
 const path = require('path');
 const fs = require('fs');
 
 const app = express();
-app.get("/", (req, res) => res.send("Bot is Active"));
+app.get("/", (req, res) => res.send("Cat is Active"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -23,35 +23,22 @@ const client = new Client({
 const VOICE_ID = '1488542254971748414'; 
 const player = createAudioPlayer();
 
-// Log player status to see where it stops
-player.on('stateChange', (oldState, newState) => {
-    console.log(`Audio Player: ${oldState.status} -> ${newState.status}`);
-});
-
-async function playMeow() {
-    // Check for the file with a capital M as seen in your upload
+// Function to play the sound
+function playMeow() {
     const filePath = path.join(__dirname, 'Meow.mp3');
-    
-    if (!fs.existsSync(filePath)) {
-        console.log("❌ ERROR: Meow.mp3 NOT FOUND. Ensure file is in the main folder.");
-        return;
-    }
+    if (!fs.existsSync(filePath)) return console.log("File Meow.mp3 not found!");
 
-    try {
-        const resource = createAudioResource(filePath, {
-            inlineVolume: true,
-            inputType: StreamType.Arbitrary
-        });
-        
-        resource.volume.setVolume(2.0); // 200% volume
-        player.play(resource);
-        console.log("✅ Meow resource sent to player.");
-    } catch (err) {
-        console.error("❌ Audio Error:", err.message);
-    }
+    const resource = createAudioResource(filePath, {
+        inlineVolume: true,
+        inputType: StreamType.Arbitrary
+    });
+    
+    resource.volume.setVolume(2.0); 
+    player.play(resource);
+    console.log("🔊 Meowing started automatically!");
 }
 
-async function connectToVoice() {
+async function connectAndSpeak() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -64,30 +51,36 @@ async function connectToVoice() {
     });
 
     try {
-        await entersState(connection, VoiceConnectionStatus.Ready, 15000);
+        await entersState(connection, VoiceConnectionStatus.Ready, 20000);
         connection.subscribe(player);
-        // Force the "Green Circle" indicator
+        
+        // --- THIS IS THE KEY ---
+        // As soon as it's ready, it meows immediately
+        playMeow(); 
+        
+        // Forces the green ring to show up
         connection.setSpeaking(true); 
-        console.log("🔊 Connection Ready and Speaking enabled.");
+
     } catch (e) {
-        console.error("❌ Connection failed:", e);
+        console.error("Connection failed:", e);
     }
 }
 
 client.once("ready", () => {
-    console.log(`Bot logged in as ${client.user.tag}`);
-    connectToVoice();
+    console.log("Bot is Online!");
+    // Auto-join and Auto-speak on startup
+    connectAndSpeak();
+
+    // Keeps it meowing every 5 minutes automatically
+    setInterval(() => {
+        playMeow();
+    }, 300000);
 });
 
 client.on("messageCreate", async (msg) => {
     if (msg.content === "/27 stay") {
-        await connectToVoice();
-        playMeow();
-        msg.reply("I'm here! Check if you see a green circle around me.");
-    }
-    if (msg.content === "/meow now") {
-        playMeow();
-        msg.reply("Meow! (Manual Trigger)");
+        await connectAndSpeak();
+        msg.reply("I'm in and I should be meowing right now!");
     }
 });
 
