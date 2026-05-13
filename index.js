@@ -1,5 +1,5 @@
 const express = require("express");
-const { Client, GatewayIntentBits } = require("discord.js");
+const { Client, GatewayIntentBits, Events } = require("discord.js");
 const { 
     joinVoiceChannel, createAudioPlayer, createAudioResource, 
     VoiceConnectionStatus, StreamType, entersState, AudioPlayerStatus 
@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
+app.get("/", (req, res) => res.send("Bot is Alive"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -23,22 +24,22 @@ const VOICE_ID = '1488542254971748414';
 const player = createAudioPlayer();
 
 function playMeow() {
-    const filePath = path.join(process.cwd(), 'Meow.mp3');
+    const filePath = path.resolve(__dirname, 'Meow.mp3');
     
     if (!fs.existsSync(filePath)) {
-        console.log("❌ FILE NOT FOUND on server!");
+        console.log("❌ FILE NOT FOUND: Check GitHub for Meow.mp3");
         return;
     }
 
-    // BYPASS: We force FFmpeg to re-read the file properly
-    const resource = createAudioResource(filePath, {
-        inputType: StreamType.Arbitrary, // This lets FFmpeg handle weird MP3s
-        inlineVolume: true
+    // This is the bypass: It tells Discord to treat the file as a raw stream
+    const resource = createAudioResource(fs.createReadStream(filePath), {
+        inlineVolume: true,
+        inputType: StreamType.Arbitrary 
     });
     
     resource.volume.setVolume(2.0); 
     player.play(resource);
-    console.log("🔊 Playback command sent.");
+    console.log("🔊 Meow stream sent to voice channel.");
 }
 
 async function connect() {
@@ -54,30 +55,31 @@ async function connect() {
     });
 
     try {
-        await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+        await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
         connection.subscribe(player);
-        connection.setSpeaking(true);
+        connection.setSpeaking(true); // Force the green ring
         playMeow();
     } catch (e) {
-        console.error("Connection failed.");
+        console.error("Connection failed:", e);
     }
 }
 
-client.once("ready", () => {
-    console.log("Bot Ready.");
+// Fixed the Deprecation Warning by using Events.ClientReady
+client.once(Events.ClientReady, () => {
+    console.log(`✅ Logged in as ${client.user.tag}`);
     connect();
+    setInterval(playMeow, 300000);
 });
 
 client.on("messageCreate", (msg) => {
     if (msg.content === "/meow now") {
         playMeow();
-        msg.reply("Meowing...");
+        msg.reply("Forcing meow stream...");
     }
-});
-
-// If the player errors, we log it exactly
-player.on('error', error => {
-  console.error(`Error: ${error.message}`);
+    if (msg.content === "/27 stay") {
+        connect();
+        msg.reply("Reconnecting to voice...");
+    }
 });
 
 client.login(process.env.TOKEN);
