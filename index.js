@@ -1,22 +1,14 @@
 const express = require("express");
 const { Client, GatewayIntentBits } = require("discord.js");
 const { 
-    joinVoiceChannel, 
-    createAudioPlayer, 
-    createAudioResource, 
-    VoiceConnectionStatus,
-    StreamType 
+    joinVoiceChannel, createAudioPlayer, createAudioResource, 
+    VoiceConnectionStatus, AudioPlayerStatus, StreamType, entersState 
 } = require('@discordjs/voice');
-const ffmpeg = require('ffmpeg-static');
 const path = require('path');
 
-// 1. Health Check Server for Railway
 const app = express();
-const PORT = process.env.PORT || 3000;
-app.get("/", (req, res) => res.send("Cat Bot is Online and Loud!"));
-app.listen(PORT, "0.0.0.0", () => console.log(`Server on port ${PORT}`));
+app.listen(process.env.PORT || 3000);
 
-// 2. Bot Setup
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds, 
@@ -26,129 +18,56 @@ const client = new Client({
   ]
 });
 
-// --- SETTINGS ---
-const TEXT_CHANNEL_ID = '1488542254598721713'; 
-const VOICE_CHANNEL_ID = '1488542254971748414'; 
-const INTERVAL = 5 * 60 * 1000; 
-
+const VOICE_ID = '1488542254971748414'; 
+const TEXT_ID = '1488542254598721713';
 const player = createAudioPlayer();
-let currentVolume = 1.0; 
 
-// The function that makes the cat "talk" (play meow.mp3)
-function playMeow(vol = currentVolume) {
+async function playMeow() {
     try {
-        const filePath = path.join(__dirname, 'meow.mp3');
-        const resource = createAudioResource(filePath, {
+        const resource = createAudioResource(path.join(__dirname, 'meow.mp3'), {
             inlineVolume: true,
-            inputType: StreamType.Arbitrary,
+            inputType: StreamType.Arbitrary
         });
-
-        resource.volume.setVolume(vol);
+        resource.volume.setVolume(1.0);
         player.play(resource);
-        console.log(`Meow played at ${vol * 100}% volume.`);
-    } catch (err) {
-        console.error("Audio Engine Error:", err.message);
-    }
+        console.log("Audio playing...");
+    } catch (e) { console.log("Audio Error:", e.message); }
 }
 
-// Function to keep the bot in the channel 24/7
-function connectAndStay() {
+async function connect() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
     const connection = joinVoiceChannel({
-        channelId: VOICE_CHANNEL_ID,
+        channelId: VOICE_ID,
         guildId: guild.id,
         adapterCreator: guild.voiceAdapterCreator,
         selfDeaf: false,
         selfMuted: false
     });
 
-    connection.subscribe(player);
-
-    connection.on(VoiceConnectionStatus.Disconnected, () => {
-        console.log("Disconnected. Reconnecting to stay 24/7...");
-        setTimeout(connectAndStay, 5000);
-    });
+    try {
+        await entersState(connection, VoiceConnectionStatus.Ready, 20000);
+        connection.subscribe(player);
+        // This 'setSpeaking' is required for the green circle to appear
+        connection.setSpeaking(true);
+    } catch (e) { console.log("Connection failed"); }
 }
 
 client.once("ready", () => {
-    console.log(`Logged in as ${client.user.tag}`);
-    connectAndStay();
-
-    // 5-Minute Loop for Chat and Voice
-    setInterval(async () => {
-        try {
-            const channel = await client.channels.fetch(TEXT_CHANNEL_ID).catch(() => null);
-            if (channel) await channel.send("Meow!");
-            playMeow();
-        } catch (e) {
-            console.log("Loop error:", e.message);
-        }
-    }, INTERVAL);
-});
-
-client.on("messageCreate", async (msg) => {
-    // Command 1: Force Stay
-    if (msg.content === "/27 stay") {
-        connectAndStay();
+    connect();
+    setInterval(() => {
+        client.channels.fetch(TEXT_ID).then(c => c.send("Meow!"));
         playMeow();
-        return msg.reply("I am now locked in this voice channel 24/7. Meow!");
-    }
-
-    // Command 2: Manual Meow
-    if (msg.content === "/meow now") {
-        playMeow();
-        return msg.reply("Meow! 🐾");
-    }
-
-    // Command 3: Volume Boost
-    if (msg.content === "/meow loud") {
-        currentVolume = 2.0;
-        playMeow(2.0);
-        return msg.reply("Volume boosted to 200%. Meow! 🔊");
-    }
-
-    // Command 4: Reset Volume
-    if (msg.content === "/meow soft") {
-        currentVolume = 1.0;
-        playMeow(1.0);
-        return msg.reply("Volume reset to 100%. Meow. 🔉");
-    }
-});
-
-// Global stability handlers
-process.on('unhandledRejection', error => console.error('Error:', error));
-client.login(process.env.TOKEN);}
-
-client.once("ready", () => {
-    console.log(`Bot Online: ${client.user.tag}`);
-    connectToVoice();
-
-    // 5-Minute Loop
-    setInterval(async () => {
-        const channel = await client.channels.fetch(TEXT_CHANNEL_ID).catch(() => null);
-        if (channel) channel.send("Meow!");
-        playMeow();
-    }, 5 * 60 * 1000);
+    }, 300000);
 });
 
 client.on("messageCreate", async (msg) => {
     if (msg.content === "/27 stay") {
-        connectToVoice();
-        playMeow(1.0);
-        msg.reply("I am here and I should be meowing now!");
+        await connect();
+        playMeow();
+        msg.reply("I am locked in. Meow!");
     }
-    
-    if (msg.content === "/meow now") {
-        playMeow(1.5); // Slightly boosted volume for testing
-        msg.reply("Meow sent to voice!");
-    }
-});
-
-// Error logging to find the silent killer
-player.on('error', error => {
-    console.error('Audio Player Error:', error.message, 'with resource', error.resource.metadata);
 });
 
 client.login(process.env.TOKEN);
