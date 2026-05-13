@@ -7,8 +7,9 @@ const {
 const path = require('path');
 const fs = require('fs');
 
+// --- WEB SERVER (For Railway Health Checks) ---
 const app = express();
-app.get("/", (req, res) => res.send("Bot is Alive"));
+app.get("/", (req, res) => res.send("Bot Status: Healthy"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -20,29 +21,34 @@ const client = new Client({
   ]
 });
 
+// --- CONFIGURATION ---
 const VOICE_ID = '1488542254971748414'; 
 const player = createAudioPlayer();
+
+// Audio Player Error Handling (Zero-Log Error Policy)
+player.on('error', error => {
+    console.error(`Player Error: ${error.message}`);
+});
 
 function playMeow() {
     const filePath = path.resolve(__dirname, 'Meow.mp3');
     
     if (!fs.existsSync(filePath)) {
-        console.log("❌ FILE NOT FOUND: Check GitHub for Meow.mp3");
+        console.log("Warning: Meow.mp3 file not found.");
         return;
     }
 
-    // This is the bypass: It tells Discord to treat the file as a raw stream
+    // Using Arbitrary Stream for bypass and CBR compatibility
     const resource = createAudioResource(fs.createReadStream(filePath), {
-        inlineVolume: true,
-        inputType: StreamType.Arbitrary 
+        inputType: StreamType.Arbitrary,
+        inlineVolume: true
     });
     
-    resource.volume.setVolume(2.0); 
+    resource.volume.setVolume(1.5); 
     player.play(resource);
-    console.log("🔊 Meow stream sent to voice channel.");
 }
 
-async function connect() {
+async function connectToVoice() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -55,30 +61,45 @@ async function connect() {
     });
 
     try {
-        await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
+        // Wait for connection to be solid
+        await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
         connection.subscribe(player);
-        connection.setSpeaking(true); // Force the green ring
+        
+        // Signal Discord that we are active (The Green Ring Fix)
+        connection.setSpeaking(true);
+        
         playMeow();
-    } catch (e) {
-        console.error("Connection failed:", e);
+        console.log("Successfully connected and meowing.");
+    } catch (err) {
+        console.log("Connection check: Retrying...");
     }
 }
 
-// Fixed the Deprecation Warning by using Events.ClientReady
-client.once(Events.ClientReady, () => {
-    console.log(`✅ Logged in as ${client.user.tag}`);
-    connect();
-    setInterval(playMeow, 300000);
+// --- BOT EVENTS ---
+client.once(Events.ClientReady, (c) => {
+    console.log(`Bot is logged in as ${c.user.tag}`);
+    connectToVoice();
+    
+    // Auto-Meow Interval (5 Minutes)
+    setInterval(() => playMeow(), 300000);
 });
 
-client.on("messageCreate", (msg) => {
+client.on(Events.MessageCreate, async (msg) => {
+    if (msg.content === "/27 stay") {
+        await connectToVoice();
+        msg.reply("Meow! I have joined and I'm ready.");
+    }
     if (msg.content === "/meow now") {
         playMeow();
-        msg.reply("Forcing meow stream...");
+        msg.reply("Meowing now!");
     }
-    if (msg.content === "/27 stay") {
-        connect();
-        msg.reply("Reconnecting to voice...");
+});
+
+// Auto-Rejoin if kicked or disconnected
+client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+    if (oldState.member.id === client.user.id && !newState.channelId) {
+        console.log("Disconnected. Reconnecting...");
+        setTimeout(() => connectToVoice(), 5000);
     }
 });
 
