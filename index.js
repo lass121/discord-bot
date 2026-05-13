@@ -1,44 +1,79 @@
 const express = require("express");
 const { Client, GatewayIntentBits } = require("discord.js");
+const { 
+    joinVoiceChannel, 
+    createAudioPlayer, 
+    createAudioResource, 
+    AudioPlayerStatus, 
+    NoSubscriberBehavior 
+} = require('@discordjs/voice');
+const path = require('path');
 
 const app = express();
-
-app.get("/", (req, res) => {
-  res.send("Bot is running.");
-});
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`Web server running on port ${PORT}`);
-});
+app.get("/", (req, res) => res.send("Bot is running."));
+app.listen(process.env.PORT || 3000);
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [
+    GatewayIntentBits.Guilds, 
+    GatewayIntentBits.GuildVoiceStates, // REQUIRED for voice
+    GatewayIntentBits.GuildMessages, 
+    GatewayIntentBits.MessageContent
+  ]
 });
+
+// --- CONFIGURATION ---
+const CHANNEL_ID = '1488542254598721713'; // Your text channel
+const VOICE_ID = 'YOUR_VOICE_CHANNEL_ID'; // Replace with your Voice Channel ID
+const MEOW_INTERVAL = 5 * 60 * 1000; 
 
 client.once("ready", async () => {
-  console.log(`Logged in as ${client.user.tag}`);
+    console.log(`Logged in as ${client.user.tag}`);
 
-  const CHANNEL_ID = '1488542254598721713'; 
-  const FIVE_MINUTES = 5 * 60 * 1000; 
-
-  try {
-    const channel = await client.channels.fetch(CHANNEL_ID);
-    if (channel && channel.isTextBased()) {
-      // Sends the first meow immediately on startup
-      await channel.send("Meow!"); 
-
-      // Then starts the 5-minute loop
-      setInterval(async () => {
-        await channel.send("Meow!");
-      }, FIVE_MINUTES);
-      
-      console.log("Meow timer started!");
+    // 1. CHAT MEOW LOGIC
+    const textChannel = await client.channels.fetch(CHANNEL_ID);
+    if (textChannel?.isTextBased()) {
+        textChannel.send("Meow! (I'm online and ready)");
+        setInterval(() => textChannel.send("Meow!"), MEOW_INTERVAL);
     }
-  } catch (error) {
-    console.error("Error starting the meow loop:", error.message);
-  }
+
+    // 2. VOICE MEOW & 24/7 LOGIC
+    connectToVoice();
 });
+
+async function connectToVoice() {
+    const guild = client.guilds.cache.first(); // Gets the first server the bot is in
+    if (!guild) return;
+
+    const connection = joinVoiceChannel({
+        channelId: VOICE_ID,
+        guildId: guild.id,
+        adapterCreator: guild.voiceAdapterCreator,
+        selfDeaf: false, // Set to false so it looks "active"
+    });
+
+    const player = createAudioPlayer({
+        behaviors: { noSubscriber: NoSubscriberBehavior.Play }
+    });
+
+    // Function to play the meow sound
+    const playMeow = () => {
+        const resource = createAudioResource(path.join(__dirname, 'meow.mp3'));
+        player.play(resource);
+    };
+
+    connection.subscribe(player);
+
+    // Play meow in voice every 5 minutes
+    setInterval(playMeow, MEOW_INTERVAL);
+
+    // 24/7 Keep-Alive: Reconnect if disconnected
+    connection.on('stateChange', (oldState, newState) => {
+        if (newState.status === 'disconnected') {
+            console.log("Disconnected from voice. Reconnecting...");
+            setTimeout(connectToVoice, 5000);
+        }
+    });
+}
 
 client.login(process.env.TOKEN);
