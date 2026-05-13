@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-app.get("/", (req, res) => res.send("Cat is ready!"));
+app.get("/", (req, res) => res.send("Bot is Active"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -25,10 +25,11 @@ const TEXT_ID = '1488542254598721713';
 const player = createAudioPlayer();
 
 async function playMeow() {
-    const filePath = path.join(__dirname, 'Meow.mp3');
+    const filePath = path.join(__dirname, 'Meow.mp3'); // Matches your capital 'M'
     
     if (!fs.existsSync(filePath)) {
-        return console.log("FILE ERROR: Meow.mp3 is missing from GitHub!");
+        console.log("FILE MISSING: Ensure Meow.mp3 is uploaded to GitHub!");
+        return;
     }
 
     try {
@@ -37,15 +38,16 @@ async function playMeow() {
             inputType: StreamType.Arbitrary
         });
         
-        resource.volume.setVolume(1.8); 
+        // Setting volume to 200% to make sure you hear it
+        resource.volume.setVolume(2.0); 
         player.play(resource);
-        console.log("Meow signal sent to voice.");
+        console.log("Meow audio sent to Discord.");
     } catch (err) {
         console.error("Audio Error:", err.message);
     }
 }
 
-async function connectToVoice() {
+async function connectAndStay() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
@@ -58,20 +60,20 @@ async function connectToVoice() {
     });
 
     try {
-        await entersState(connection, VoiceConnectionStatus.Ready, 20000);
+        await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
         connection.subscribe(player);
-        // This makes the bot "active" so the green circle appears
+        // Force Discord to show the green "speaking" ring
         connection.setSpeaking(true); 
-        console.log("Voice connection ready!");
     } catch (e) {
-        console.error("Connection failed:", e);
+        console.error("Voice connection failed:", e);
     }
 }
 
 client.once("ready", () => {
-    console.log("Bot is Online!");
-    connectToVoice();
+    console.log("Bot is Online and Ready!");
+    connectAndStay();
 
+    // Meow loop every 5 minutes
     setInterval(() => {
         client.channels.fetch(TEXT_ID).then(c => c.send("Meow!")).catch(() => null);
         playMeow();
@@ -80,9 +82,9 @@ client.once("ready", () => {
 
 client.on("messageCreate", async (msg) => {
     if (msg.content === "/27 stay") {
-        await connectToVoice();
+        await connectAndStay();
         playMeow();
-        msg.reply("I'm in! If you can't hear me, check if I'm Server Muted.");
+        msg.reply("I'm here! If you don't hear me, check if I'm Server Muted.");
     }
 });
 
