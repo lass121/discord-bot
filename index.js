@@ -22,8 +22,9 @@ const client = new Client({
 });
 
 // --- SETTINGS ---
+// I used the ID you provided earlier. Ensure this is your VOICE channel ID.
 const TEXT_CHANNEL_ID = '1488542254598721713'; 
-const VOICE_CHANNEL_ID = 'PASTE_YOUR_VOICE_ID_HERE'; // <--- Don't forget this!
+const VOICE_CHANNEL_ID = '1488542254598721713'; 
 const INTERVAL = 5 * 60 * 1000; 
 
 let connection;
@@ -32,43 +33,53 @@ const player = createAudioPlayer();
 client.once("ready", async () => {
     console.log(`Logged in as ${client.user.tag}`);
     
-    const textChannel = await client.channels.fetch(TEXT_CHANNEL_ID);
-    
     // Connect to voice immediately
     maintainVoiceConnection();
 
     // The 5-minute loop
     setInterval(async () => {
-        // 1. Chat Meow
-        if (textChannel) textChannel.send("Meow!");
+        try {
+            // 1. Chat Meow
+            const textChannel = await client.channels.fetch(TEXT_CHANNEL_ID);
+            if (textChannel && textChannel.isTextBased()) {
+                await textChannel.send("Meow!");
+            }
 
-        // 2. Voice Meow
-        playMeowFile();
+            // 2. Voice Meow
+            playMeowFile();
+        } catch (err) {
+            console.error("Loop error:", err.message);
+        }
     }, INTERVAL);
 });
 
 function maintainVoiceConnection() {
-    const guild = client.guilds.cache.first();
-    if (!guild) return;
+    try {
+        const guild = client.guilds.cache.first();
+        if (!guild) return console.error("Bot is not in any servers!");
 
-    connection = joinVoiceChannel({
-        channelId: VOICE_CHANNEL_ID,
-        guildId: guild.id,
-        adapterCreator: guild.voiceAdapterCreator,
-        selfDeaf: false // Keeps the bot looking "active"
-    });
+        connection = joinVoiceChannel({
+            channelId: VOICE_CHANNEL_ID,
+            guildId: guild.id,
+            adapterCreator: guild.voiceAdapterCreator,
+            selfDeaf: false
+        });
 
-    // 24/7 Logic: If kicked or disconnected, try to reconnect
-    connection.on(VoiceConnectionStatus.Disconnected, () => {
-        console.log("Disconnected from voice! Reconnecting in 5 seconds...");
-        setTimeout(maintainVoiceConnection, 5000);
-    });
+        connection.on(VoiceConnectionStatus.Disconnected, () => {
+            console.log("Disconnected from voice! Reconnecting in 5 seconds...");
+            setTimeout(maintainVoiceConnection, 5000);
+        });
 
-    connection.subscribe(player);
+        connection.subscribe(player);
+        console.log("Successfully joined voice channel.");
+    } catch (error) {
+        console.error("Voice Connection Error:", error.message);
+    }
 }
 
 function playMeowFile() {
     try {
+        // This looks for the meow.mp3 file you uploaded to your GitHub
         const resource = createAudioResource(path.join(__dirname, 'meow.mp3'));
         player.play(resource);
         console.log("Played meow.mp3 in voice channel.");
